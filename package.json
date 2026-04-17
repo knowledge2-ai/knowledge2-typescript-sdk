@@ -1,0 +1,65 @@
+{
+  "name": "@knowledge2/sdk",
+  "version": "0.2.0",
+  "description": "TypeScript SDK for the Knowledge2 retrieval platform API",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src/",
+    "generate": "node ./scripts/generate-types.mjs",
+    "generate:public": "node ./scripts/generate-public-types.mjs src/types/generated.public.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint": "^10.2.0",
+    "openapi-typescript": "^7.13.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.7.0"
+  },
+  "overrides": {
+    "flatted": "3.4.2"
+  },
+  "keywords": [
+    "knowledge2",
+    "k2",
+    "sdk",
+    "typescript",
+    "retrieval",
+    "search",
+    "rag"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/knowledge2-ai/knowledge2-typescript-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/knowledge2-ai/knowledge2-typescript-sdk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/knowledge2-ai/knowledge2-typescript-sdk.git"
+  }
+}
