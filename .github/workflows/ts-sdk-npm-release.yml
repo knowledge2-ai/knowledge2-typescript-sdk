@@ -1,0 +1,106 @@
+name: ts-sdk-npm-release
+
+on:
+  push:
+    tags:
+      - "ts-sdk-v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-test-publish:
+    runs-on: ubuntu-24.04
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Version guard
+        run: |
+          set -euo pipefail
+
+          tag_version="${GITHUB_REF_NAME#ts-sdk-v}"
+          package_version="$(node -p "require('./package.json').version")"
+
+          echo "Tag version:     ${tag_version}"
+          echo "Package version: ${package_version}"
+
+          if [ "${tag_version}" != "${package_version}" ]; then
+            echo "::error::Tag version (${tag_version}) does not match package.json version (${package_version})"
+            exit 1
+          fi
+
+      - name: Publish metadata guard
+        run: |
+          node - <<'NODE'
+          const pkg = require("./package.json");
+          const expected = {
+            name: "@knowledge2/sdk",
+            repository: "https://github.com/knowledge2-ai/knowledge2-typescript-sdk.git",
+            homepage: "https://github.com/knowledge2-ai/knowledge2-typescript-sdk#readme",
+            bugs: "https://github.com/knowledge2-ai/knowledge2-typescript-sdk/issues",
+          };
+
+          if (pkg.name !== expected.name) {
+            throw new Error(`name must be ${expected.name}`);
+          }
+          if (!pkg.repository || pkg.repository.url !== expected.repository) {
+            throw new Error(`repository.url must be ${expected.repository}`);
+          }
+          if (pkg.repository.directory) {
+            throw new Error("repository.directory must be omitted in the public repo package.json");
+          }
+          if (pkg.homepage !== expected.homepage) {
+            throw new Error(`homepage must be ${expected.homepage}`);
+          }
+          if (!pkg.bugs || pkg.bugs.url !== expected.bugs) {
+            throw new Error(`bugs.url must be ${expected.bugs}`);
+          }
+          NODE
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack release tarball
+        id: pack
+        run: |
+          set -euo pipefail
+
+          package_file="$(npm pack --json | node -e "const fs = require('fs'); const output = JSON.parse(fs.readFileSync(0, 'utf8')); process.stdout.write(output[0].filename);")"
+          echo "package_file=${package_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Smoke test release tarball
+        env:
+          PACKAGE_FILE: ${{ steps.pack.outputs.package_file }}
+        run: |
+          set -euo pipefail
+
+          smoke_dir="$(mktemp -d)"
+          cd "${smoke_dir}"
+          npm init -y >/dev/null 2>&1
+          npm install "${GITHUB_WORKSPACE}/${PACKAGE_FILE}"
+          node --input-type=module -e "import { Knowledge2 } from '@knowledge2/sdk'; if (typeof Knowledge2 !== 'function') { throw new Error(\`Expected ESM Knowledge2 export to be a function, got \${typeof Knowledge2}\`); }"
+          node -e "const { Knowledge2 } = require('@knowledge2/sdk'); if (typeof Knowledge2 !== 'function') { throw new Error(\`Expected CommonJS Knowledge2 export to be a function, got \${typeof Knowledge2}\`); }"
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
